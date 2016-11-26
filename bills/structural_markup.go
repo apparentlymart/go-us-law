@@ -106,45 +106,39 @@ func decodeStructuralElement(d *xml.Decoder, start xml.StartElement) (Structural
 }
 
 type Structural interface {
-
-	// ChildElements returns the child nodes of a structural node, or
-	// nil if a particular node type is a leaf.
+	Enumerator() InlineMarkup
+	Header() InlineMarkup
+	Text() InlineMarkup
 	ChildElements() StructuralMarkup
-}
-
-// UnsupportedStructuralElement is a placeholder node type for structural nodes
-// we don't yet support.
-//
-// Callers should ignore nodes of this type except to walk to the children
-// when traversing the graph; future versions of this package may start
-// to support the given element, which would be a breaking change for any
-// caller that specifically depends on recieving UnsupportedStructuralElement
-// instances.
-type UnsupportedStructuralElement struct {
-	Name  xml.Name
-	Attrs map[xml.Name]string
-	StructuralMarkup
-}
-
-func (n *UnsupportedStructuralElement) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
-	n.Name = start.Name
-	n.Attrs = make(map[xml.Name]string, len(start.Attr))
-	for _, attr := range start.Attr {
-		n.Attrs[attr.Name] = attr.Value
-	}
-	return n.StructuralMarkup.UnmarshalXML(d, start)
+	ContinuationText() InlineMarkup
 }
 
 type StructuralElement struct {
-	Enumerator       InlineMarkup
-	Header           InlineMarkup
-	Text             InlineMarkup
-	ChildElems       StructuralMarkup
-	ContinuationText InlineMarkup
+	enumerator       InlineMarkup
+	header           InlineMarkup
+	text             InlineMarkup
+	childElements    StructuralMarkup
+	continuationText InlineMarkup
+}
+
+func (m *StructuralElement) Enumerator() InlineMarkup {
+	return m.enumerator
+}
+
+func (m *StructuralElement) Header() InlineMarkup {
+	return m.header
+}
+
+func (m *StructuralElement) Text() InlineMarkup {
+	return m.text
 }
 
 func (m *StructuralElement) ChildElements() StructuralMarkup {
-	return m.ChildElems
+	return m.childElements
+}
+
+func (m *StructuralElement) ContinuationText() InlineMarkup {
+	return m.text
 }
 
 func (m *StructuralElement) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
@@ -162,22 +156,22 @@ func (m *StructuralElement) UnmarshalXML(d *xml.Decoder, start xml.StartElement)
 		case xml.StartElement:
 			switch t.Name.Local {
 			case "continuation-text":
-				err := d.DecodeElement(&m.ContinuationText, &t)
+				err := d.DecodeElement(&m.continuationText, &t)
 				if err != nil {
 					return err
 				}
 			case "enum":
-				err := d.DecodeElement(&m.Enumerator, &t)
+				err := d.DecodeElement(&m.enumerator, &t)
 				if err != nil {
 					return err
 				}
 			case "header":
-				err := d.DecodeElement(&m.Header, &t)
+				err := d.DecodeElement(&m.header, &t)
 				if err != nil {
 					return err
 				}
 			case "text":
-				err := d.DecodeElement(&m.Text, &t)
+				err := d.DecodeElement(&m.text, &t)
 				if err != nil {
 					return err
 				}
@@ -186,7 +180,7 @@ func (m *StructuralElement) UnmarshalXML(d *xml.Decoder, start xml.StartElement)
 				if err != nil {
 					return err
 				}
-				m.ChildElems = append(m.ChildElems, obj)
+				m.childElements = append(m.childElements, obj)
 			}
 		}
 	}
@@ -254,4 +248,27 @@ type Title struct {
 
 type Subtitle struct {
 	StructuralElement
+}
+
+// UnsupportedStructuralElement is a placeholder node type for structural nodes
+// we don't yet support.
+//
+// Callers should ignore nodes of this type except to walk to the children
+// when traversing the graph; future versions of this package may start
+// to support the given element, which would be a breaking change for any
+// caller that specifically depends on recieving UnsupportedStructuralElement
+// instances.
+type UnsupportedStructuralElement struct {
+	Name  xml.Name
+	Attrs map[xml.Name]string
+	StructuralElement
+}
+
+func (n *UnsupportedStructuralElement) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	n.Name = start.Name
+	n.Attrs = make(map[xml.Name]string, len(start.Attr))
+	for _, attr := range start.Attr {
+		n.Attrs[attr.Name] = attr.Value
+	}
+	return n.StructuralElement.UnmarshalXML(d, start)
 }
