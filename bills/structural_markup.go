@@ -109,6 +109,7 @@ type Structural interface {
 	Enumerator() InlineMarkup
 	Header() InlineMarkup
 	Text() InlineMarkup
+	Blocks() BlockMarkup
 	ChildElements() StructuralMarkup
 	ContinuationText() InlineMarkup
 }
@@ -117,6 +118,7 @@ type StructuralElement struct {
 	enumerator       InlineMarkup
 	header           InlineMarkup
 	text             InlineMarkup
+	blocks           BlockMarkup
 	childElements    StructuralMarkup
 	continuationText InlineMarkup
 }
@@ -131,6 +133,10 @@ func (m *StructuralElement) Header() InlineMarkup {
 
 func (m *StructuralElement) Text() InlineMarkup {
 	return m.text
+}
+
+func (m *StructuralElement) Blocks() BlockMarkup {
+	return m.blocks
 }
 
 func (m *StructuralElement) ChildElements() StructuralMarkup {
@@ -154,6 +160,17 @@ func (m *StructuralElement) UnmarshalXML(d *xml.Decoder, start xml.StartElement)
 			// all done!
 			return nil
 		case xml.StartElement:
+
+			// Block elements can be directly nested in structural elements.
+			if isBlockElement(t.Name) {
+				obj, err := decodeBlockElement(d, t)
+				if err != nil {
+					return err
+				}
+				m.blocks = append(m.blocks, obj)
+				continue
+			}
+
 			switch t.Name.Local {
 			case "continuation-text":
 				err := d.DecodeElement(&m.continuationText, &t)
